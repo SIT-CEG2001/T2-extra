@@ -52,6 +52,8 @@ class ObstacleAvoider(Node):
 
         # Synchronous Initialization
         self.draw_obstacle_boundary()
+        self.draw_goal_marker() # New: Draw the goal marker
+        
         # Resetting to (1.0, 5.5) to start safely outside the avoidance zone.
         self.reset_turtle(1.0, 5.5, 0.0)
         self.get_logger().info(f'Turtle reset to start position (1.0, 5.5). Navigation starting.')
@@ -71,12 +73,59 @@ class ObstacleAvoider(Node):
             self.get_logger().error(f'Service call failed for client {client.srv_name}.')
             return None
 
+    def draw_goal_marker(self):
+        """Draws a simple crosshair marker at the goal location (9.0, 9.0)."""
+        marker_color = [0, 255, 0] # Green
+        marker_width = 3
+        marker_size = 0.3 # Half length of cross lines
+
+        # 1. Set pen OFF and move to center of the cross (Synchronous)
+        pen_off_req = SetPen.Request(r=marker_color[0], g=marker_color[1], b=marker_color[2], width=marker_width, off=1)
+        self.call_service(self.set_pen_cli, pen_off_req)
+        
+        teleport_center_req = TeleportAbsolute.Request(x=self.goal_x, y=self.goal_y, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_center_req)
+        
+        # 2. Draw the Horizontal line (Pen ON for drawing)
+        pen_on_req = SetPen.Request(r=marker_color[0], g=marker_color[1], b=marker_color[2], width=marker_width, off=0)
+        self.call_service(self.set_pen_cli, pen_on_req)
+        
+        # Draw from left to right
+        teleport_start_req = TeleportAbsolute.Request(x=self.goal_x - marker_size, y=self.goal_y, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_start_req)
+        teleport_end_req = TeleportAbsolute.Request(x=self.goal_x + marker_size, y=self.goal_y, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_end_req)
+
+        # 3. Draw the Vertical line (Pen OFF to move back to center, then ON for vertical)
+        pen_off_req = SetPen.Request(r=marker_color[0], g=marker_color[1], b=marker_color[2], width=marker_width, off=1)
+        self.call_service(self.set_pen_cli, pen_off_req)
+        teleport_center_req = TeleportAbsolute.Request(x=self.goal_x, y=self.goal_y, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_center_req)
+        
+        pen_on_req = SetPen.Request(r=marker_color[0], g=marker_color[1], b=marker_color[2], width=marker_width, off=0)
+        self.call_service(self.set_pen_cli, pen_on_req)
+
+        # Draw from bottom to top
+        teleport_start_req = TeleportAbsolute.Request(x=self.goal_x, y=self.goal_y - marker_size, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_start_req)
+        teleport_end_req = TeleportAbsolute.Request(x=self.goal_x, y=self.goal_y + marker_size, theta=0.0)
+        self.call_service(self.teleport_cli, teleport_end_req)
+        
+        # 4. Turn the pen off and reset to default for the turtle
+        pen_default_req = SetPen.Request(r=255, g=255, b=255, width=2, off=1)
+        self.call_service(self.set_pen_cli, pen_default_req)
+
 
     def draw_obstacle_boundary(self):
         """Draws the visible boundary of the obstacle using synchronous service calls."""
 
         # 1. Clear the screen (Synchronous)
-        self.call_service(self.clear_cli, Empty.Request())
+        # We don't clear here because we want the goal marker to remain
+        # self.call_service(self.clear_cli, Empty.Request()) 
+        
+        # ... (rest of the obstacle drawing logic remains the same) ...
+        # NOTE: I am moving the Clear operation out of this function and into __init__ 
+        # to ensure it's the very first drawing operation.
 
         # 2. Define the path points 
         points = [
